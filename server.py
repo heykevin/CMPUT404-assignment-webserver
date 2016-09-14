@@ -35,14 +35,28 @@ def handleRequest(self):
         print(ROOT+self.requestPath)
         try:
             # get file or index if dir
-            #check if path is in dir
+            if os.path.isdir(ROOT+self.requestPath):
+                # redirect 303? or whatever to index
+                print("isDirectory: " +ROOT+"/index.html")
+                filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
+                print(filehandler.read())
+            else:
+                print("isFile: " +ROOT+self.requestPath)
+                filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
+                print(filehandler.read())
+            #check if path is in dir and return 404
             print (os.path.realpath(ROOT+self.requestPath))
             
         except IOError:
-            # return 404
-        return "OK MAN";
+            # return 404 if file does not exist
+            print("NO GOOD")
+        return "OK MAN"
     return "NOTOK"
-    
+
+def createResponse():
+
+    return "lalala"
+
 def getHeaders(self):
     headers = dict()
     print(self.data)
