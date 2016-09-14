@@ -32,6 +32,7 @@ ROOT = "www"
 
 def handleRequest(self):
     if (self.requestMethod == "GET"):
+        #check if path is in dir and return 404
         print(ROOT+self.requestPath)
         try:
             # get file or index if dir
@@ -39,12 +40,11 @@ def handleRequest(self):
                 # redirect 303? or whatever to index
                 print("isDirectory: " +ROOT+"/index.html")
                 filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
-                print(filehandler.read())
+                return createResponse(filehandler.read())
             else:
                 print("isFile: " +ROOT+self.requestPath)
                 filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
-                print(filehandler.read())
-            #check if path is in dir and return 404
+                return filehandler.read()
             print (os.path.realpath(ROOT+self.requestPath))
             
         except IOError:
@@ -53,23 +53,33 @@ def handleRequest(self):
         return "OK MAN"
     return "NOTOK"
 
-def createResponse():
+# createresponse adapted from stackoverflow
+def createResponse(body):
+    # body no sending head
+    print(body)
+    responseBody = body
+    # get proper mimetype
+    responseHeaders = {
+        "Content-Type": "text/html",
+        "Connection": "close"
+    }
+    responseStatus = "HTTP/1.1 200 OK\r\n"
+    response_headers_raw = "".join("%s: %s\n" % (k, v) for k, v in responseHeaders.iteritems())
 
-    return "lalala"
+    return responseStatus + response_headers_raw + responseBody
 
 def getHeaders(self):
     headers = dict()
     print(self.data)
-    rawHeaders = self.data.split("\r\n");
-    self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ");
+    rawHeaders = self.data.split("\r\n")
+    self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
     self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
 
 class MyWebServer(SocketServer.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
         getHeaders(self)
-        handleRequest(self)
-        self.request.sendall("OK")
+        self.request.sendall(handleRequest(self))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080

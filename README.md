@@ -22,3 +22,4 @@ examples thus some of the code is Copyright © 2001-2013 Python
 Software Foundation; All Rights Reserved under the PSF license (GPL
 compatible) http://docs.python.org/2/library/socketserver.html
 
+http://stackoverflow.com/questions/10114224/how-to-properly-send-http-response-with-python-using-socket-library-only
