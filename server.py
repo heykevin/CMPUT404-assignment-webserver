@@ -40,37 +40,43 @@ def handleRequest(self):
                 # redirect 303? or whatever to index
                 print("isDirectory: " +ROOT+"/index.html")
                 filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
-                return createResponse(filehandler.read())
+                filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath+"index.html"))
+                return createResponse(filehandler.read(), extension)
             else:
                 print("isFile: " +ROOT+self.requestPath)
                 filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
-                return filehandler.read()
-            print (os.path.realpath(ROOT+self.requestPath))
-            
+                filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath))
+                print (os.path.realpath(ROOT+self.requestPath))
+                return createResponse(filehandler.read(), extension)
+
         except IOError:
             # return 404 if file does not exist
             print("NO GOOD")
+            return "HTTP/1.1 404 NOT FOUND\r\n"
         return "OK MAN"
     return "NOTOK"
 
 # createresponse adapted from stackoverflow
-def createResponse(body):
+def createResponse(body, ext):
     # body no sending head
     print(body)
+    print(ext.strip("."))
     responseBody = body
     # get proper mimetype
     responseHeaders = {
-        "Content-Type": "text/html",
+        "Content-Type": "text/"+ext.strip(".")+"; charset=utf-8",
+        "Content-Length": len(body),
         "Connection": "close"
     }
     responseStatus = "HTTP/1.1 200 OK\r\n"
-    response_headers_raw = "".join("%s: %s\n" % (k, v) for k, v in responseHeaders.iteritems())
-
-    return responseStatus + response_headers_raw + responseBody
+    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
+    print(responseBody)
+    # need extra \n before body for css to work?
+    return responseStatus + response_headers_raw +"\r\n"+responseBody
 
 def getHeaders(self):
     headers = dict()
-    print(self.data)
+    print("data: "+self.data)
     rawHeaders = self.data.split("\r\n")
     self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
     self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
