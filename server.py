@@ -26,12 +26,35 @@ import SocketServer
 
 # try: curl -v -X GET http://127.0.0.1:8080/
 
+import os
+
+ROOT = "www"
+
+def handleRequest(self):
+    if (self.requestMethod == "GET"):
+        print(ROOT+self.requestPath)
+        try:
+            # get file or index if dir
+            #check if path is in dir
+            print (os.path.realpath(ROOT+self.requestPath))
+            
+        except IOError:
+            # return 404
+        return "OK MAN";
+    return "NOTOK"
+    
+def getHeaders(self):
+    headers = dict()
+    print(self.data)
+    rawHeaders = self.data.split("\r\n");
+    self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ");
+    self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
 
 class MyWebServer(SocketServer.BaseRequestHandler):
-    
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
+        getHeaders(self)
+        handleRequest(self)
         self.request.sendall("OK")
 
 if __name__ == "__main__":
