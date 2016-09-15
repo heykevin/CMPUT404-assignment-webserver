@@ -31,54 +31,59 @@ import os
 ROOT = "www"
 
 def handleRequest(self):
-    if (self.requestMethod == "GET"):
+    if self.requestMethod == "GET":
         #check if path is in dir and return 404
-        print(ROOT+self.requestPath)
+        realpath = os.path.realpath(ROOT+self.requestPath)
         try:
             # get file or index if dir
-            if os.path.isdir(ROOT+self.requestPath):
+            if os.path.isdir(realpath):
                 # redirect 303? or whatever to index
-                print("isDirectory: " +ROOT+"/index.html")
+                print("isDirectory: " +realpath+ "/index.html")
                 filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
-                filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath+"index.html"))
-                return createResponse(filehandler.read(), extension)
+                return createResponse(filehandler.read(), "html")
             else:
-                print("isFile: " +ROOT+self.requestPath)
+                print("isFile: " + realpath)
                 filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
                 filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath))
                 print (os.path.realpath(ROOT+self.requestPath))
-                return createResponse(filehandler.read(), extension)
+                return createResponse(filehandler.read(), extension.strip("."))
 
         except IOError:
             # return 404 if file does not exist
             print("NO GOOD")
-            return "HTTP/1.1 404 NOT FOUND\r\n"
+            return createErrorResponse()
         return "OK MAN"
     return "NOTOK"
 
 # createresponse adapted from stackoverflow
 def createResponse(body, ext):
-    # body no sending head
-    print(body)
-    print(ext.strip("."))
-    responseBody = body
-    # get proper mimetype
     responseHeaders = {
-        "Content-Type": "text/"+ext.strip(".")+"; charset=utf-8",
+        "Content-Type": "text/%s" % ext,
         "Content-Length": len(body),
         "Connection": "close"
     }
     responseStatus = "HTTP/1.1 200 OK\r\n"
     response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
-    print(responseBody)
-    # need extra \n before body for css to work?
-    return responseStatus + response_headers_raw +"\r\n"+responseBody
+    return "%s%s\r\n%s" % (responseStatus, response_headers_raw, body)
+
+def createErrorResponse():
+    body = "<HTML><BODY>NOT FOUDNAKL DJAKLSDJ ALSJKD</BODY></HTML>"
+    responseHeaders = {
+        "Content-Type": "text/html",
+        "Content-Length": len(body),
+        "Connection": "close"
+    }
+
+    responseStatus = "HTTP/1.1 404 NOT FOUND\r\n"
+    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
+    return "%s%s\r\n%s" % (responseStatus, response_headers_raw, body)
 
 def getHeaders(self):
     headers = dict()
     print("data: "+self.data)
     rawHeaders = self.data.split("\r\n")
     self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
+    print(self.requestPath)
     self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
 
 class MyWebServer(SocketServer.BaseRequestHandler):
