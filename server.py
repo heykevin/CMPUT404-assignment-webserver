@@ -1,7 +1,7 @@
 #  coding: utf-8
 import SocketServer
 
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
+# Copyright 2016 Kevin Tang, Abram Hindle, Eddie Antonio Santos
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,82 +30,69 @@ import os
 
 ROOT = "www"
 
+responses = {
+    200: ("OK", ""),
+    302: ("Found", ""),
+    404: ("Not found", "The requested URL was not found"),
+    405: ("Method not allowed", "This method is not allowed")
+}
+
 def handleRequest(self):
+    # Setting paths
+    self.rootPath = os.path.realpath(ROOT)
+    self.realRequestPath = os.path.realpath(ROOT+self.requestPath)
+
     if self.requestMethod == "GET":
         #check if path is in dir and return 404
-        realpath = os.path.realpath(ROOT+self.requestPath)
-        print "Checking path and dir"
-        print os.path.realpath(ROOT+self.requestPath)
-        print os.path.realpath(ROOT)
-        print os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)])
-        print os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)]) == os.path.realpath(ROOT)
-        if not os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)]) == os.path.realpath(ROOT):
-            print "not in same dir"
-            return createErrorResponse()
+        if not os.path.commonprefix([self.rootPath, self.realRequestPath]) == self.rootPath:
+            return createErrorResponse(404)
 
-        try:
-            # get file or index if dir
-            if os.path.isdir(realpath):
-                # redirect 303? or whatever to index
-                print("isDirectory: " +ROOT+self.requestPath+"index.html")
-                filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
-                return createRedirectResponse(self.requestPath+"index.html", "html")
-            else:
-                print("isFile: " + ROOT+self.requestPath)
-                filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
-                filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath))
-                print (os.path.realpath(ROOT+self.requestPath))
-                return createResponse(filehandler.read(), extension.strip("."))
+        # If in directory, redirect to index.html
+        if os.path.isdir(self.realRequestPath):
+            return createResponse(302, "html", None,"index.html")
 
-        except IOError:
+        # If retrieving a file, try to open and read
+        else:
+            try:
+                filehandler = open(self.realRequestPath, "rb")
+                filename, extension = os.path.splitext(self.realRequestPath)
+                return createResponse(200, extension.strip("."), filehandler.read())
             # return 404 if file does not exist
-            print("NO GOOD")
-            return createErrorResponse()
-        return "OK MAN"
-    return "NOTOK"
+            except IOError:
+                return createErrorResponse(404)
 
-# createresponse adapted from stackoverflow
-def createResponse(body, ext):
-    print 200
-    responseHeaders = {
+    # generate 405 other method used
+    return createErrorResponse(405)
+
+# createResponse was adapted from stackoverflow. Author: toriningen
+# http://stackoverflow.com/questions/10114224/how-to-properly-send-http-response-with-python-using-socket-library-only
+def createResponse(code, ext, body, location=None) :
+    resStatus = "HTTP/1.1 %s %s" % (code, responses[code][0])
+    headers = {
         "Content-Type": "text/%s" % ext,
-        "Content-Length": len(body),
-        "Connection": "close"
-    }
-    responseStatus = "HTTP/1.1 200 OK\r\n"
-    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
-    return "%s%s\r\n%s" % (responseStatus, response_headers_raw, body)
-
-def createErrorResponse():
-    body = "<HTML><BODY>NOT FOUDNAKL DJAKLSDJ ALSJKD</BODY></HTML>"
-    responseHeaders = {
-        "Content-Type": "text/html",
-        "Content-Length": len(body),
         "Connection": "close"
     }
 
-    responseStatus = "HTTP/1.1 404 NOT FOUND\r\n"
-    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
-    return "%s%s\r\n%s" % (responseStatus, response_headers_raw, body)
+    # Adding additional headers
+    if code == 200 or code == 404:
+        headers["Content-Length"] = len(body)
+    if code == 302:
+        headers["Location"] = location
 
-def createRedirectResponse(location, ext):
-    print("Redirecting")
-    print location
-    responseHeaders = {
-        "Content-Type": "text/%s" % ext,
-        "Location": location,
-        "Connection": "close"
-    }
-    responseStatus = "HTTP/1.1 302 FOUND\r\n"
-    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
-    return "%s%s\r\n" % (responseStatus, response_headers_raw)
+    # Joining headers into a string
+    resHeaders =  "".join("%s: %s\r\n" % (k, v) for k, v in headers.iteritems())
+    return "%s\r\n%s\r\n%s" % (resStatus, resHeaders, body)
 
+def createErrorResponse(code):
+    body = "<html><head><title> %s %s </title></head>" % (code, responses[code][0]) + \
+        "<body><b>%s</b> %s" % (code, responses[code][1]) + \
+        "</body></html>"
+    return createResponse(code, "html", body)
+
+# Separate headers in the request
 def parseHeaders(self):
-    headers = dict()
-    print("data: "+self.data)
     rawHeaders = self.data.split("\r\n")
-    # empty requests
-    try: 
+    try:
         self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
         self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
     except ValueError as e:
@@ -114,8 +101,11 @@ def parseHeaders(self):
 class MyWebServer(SocketServer.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        parseHeaders(self)
-        self.request.sendall(handleRequest(self))
+        print("data: "+self.data)
+        # ignore empty requests
+        if self.data:
+            parseHeaders(self)
+            self.request.sendall(handleRequest(self))
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
