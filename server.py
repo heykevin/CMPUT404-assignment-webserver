@@ -1,14 +1,14 @@
-#  coding: utf-8 
+#  coding: utf-8
 import SocketServer
 
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -34,15 +34,24 @@ def handleRequest(self):
     if self.requestMethod == "GET":
         #check if path is in dir and return 404
         realpath = os.path.realpath(ROOT+self.requestPath)
+        print "Checking path and dir"
+        print os.path.realpath(ROOT+self.requestPath)
+        print os.path.realpath(ROOT)
+        print os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)])
+        print os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)]) == os.path.realpath(ROOT)
+        if not os.path.commonprefix([os.path.realpath(ROOT), os.path.realpath(ROOT+self.requestPath)]) == os.path.realpath(ROOT):
+            print "not in same dir"
+            return createErrorResponse()
+
         try:
             # get file or index if dir
             if os.path.isdir(realpath):
                 # redirect 303? or whatever to index
-                print("isDirectory: " +realpath+ "/index.html")
+                print("isDirectory: " +ROOT+self.requestPath+"index.html")
                 filehandler = open(os.path.realpath(ROOT+self.requestPath+"index.html"), "rb")
-                return createResponse(filehandler.read(), "html")
+                return createRedirectResponse(self.requestPath+"index.html", "html")
             else:
-                print("isFile: " + realpath)
+                print("isFile: " + ROOT+self.requestPath)
                 filehandler = open(os.path.realpath(ROOT+self.requestPath), "rb")
                 filename, extension = os.path.splitext(os.path.realpath(ROOT+self.requestPath))
                 print (os.path.realpath(ROOT+self.requestPath))
@@ -57,6 +66,7 @@ def handleRequest(self):
 
 # createresponse adapted from stackoverflow
 def createResponse(body, ext):
+    print 200
     responseHeaders = {
         "Content-Type": "text/%s" % ext,
         "Content-Length": len(body),
@@ -78,18 +88,33 @@ def createErrorResponse():
     response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
     return "%s%s\r\n%s" % (responseStatus, response_headers_raw, body)
 
-def getHeaders(self):
+def createRedirectResponse(location, ext):
+    print("Redirecting")
+    print location
+    responseHeaders = {
+        "Content-Type": "text/%s" % ext,
+        "Location": location,
+        "Connection": "close"
+    }
+    responseStatus = "HTTP/1.1 302 FOUND\r\n"
+    response_headers_raw = "".join("%s: %s\r\n" % (k, v) for k, v in responseHeaders.iteritems())
+    return "%s%s\r\n" % (responseStatus, response_headers_raw)
+
+def parseHeaders(self):
     headers = dict()
     print("data: "+self.data)
     rawHeaders = self.data.split("\r\n")
-    self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
-    print(self.requestPath)
-    self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
+    # empty requests
+    try: 
+        self.requestMethod, self.requestPath, self.requestConn = rawHeaders[0].split(" ")
+        self.headers = dict(item.split(": ", 1) for item in rawHeaders[1:])
+    except ValueError as e:
+        print e
 
 class MyWebServer(SocketServer.BaseRequestHandler):
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        getHeaders(self)
+        parseHeaders(self)
         self.request.sendall(handleRequest(self))
 
 if __name__ == "__main__":
